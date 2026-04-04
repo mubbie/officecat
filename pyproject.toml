@@ -10,11 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
-    "click>=8.0",
+    "typer>=0.9",
+    "textual>=0.50",
     "python-docx>=1.0",
     "python-pptx>=0.6",
     "openpyxl>=3.1",
-    "rich>=13.0",
 ]
 
 [project.scripts]

@@ -11,35 +11,47 @@ pip install -e .
 ## Usage
 
 ```bash
-officecat report.docx
-officecat slides.pptx
-officecat budget.xlsx
-officecat data.csv
+officecat report.docx              # interactive TUI viewer
+officecat report.docx --rich       # colored formatted dump (like cat)
+officecat budget.xlsx | head       # plain text (auto-detected pipe)
+officecat slides.pptx --json       # JSON output
 ```
+
+### Output Modes
+
+- **TUI** (default when TTY): Interactive viewer with scrolling, tabs for sheets/slides, and keyboard navigation.
+- **Rich** (`--rich`): Colored, formatted dump to stdout. Non-interactive, pairs well with `less -R`.
+- **Plain** (auto when piped, or `--plain`): Pipe-friendly text output.
+- **JSON** (`--json`): Structured output for scripting.
 
 ### Options
 
 | Flag | Short | Description |
 |---|---|---|
-| `--plain` | `-p` | Plain text output, no colors/boxes |
+| `--rich` | `-r` | Colored formatted dump (non-interactive) |
+| `--plain` | `-p` | Plain text output, no colors |
 | `--json` | `-j` | JSON output |
 | `--head N` | `-n N` | Show first N items (rows/paragraphs/slides) |
 | `--list` | `-l` | List contents only (sheet names, slide titles, heading outline) |
-| `--sheet S` | `-s S` | Select sheet by name or 1-based index (xlsx only) |
+| `--sheet S` | `-s S` | Select sheet by name or 1-based index (xlsx/csv only) |
 | `--slide N` | | Show only slide N (pptx only) |
 | `--headers N` | `-h N` | Promote row N as column headers (xlsx/csv, default: 1, 0 to disable) |
 | `--all` | `-a` | Disable the default 500-row cap for large spreadsheets |
 
-### Output Modes
+### TUI Key Bindings
 
-- **Rich** (default): Colored, formatted terminal output with tables and panels.
-- **Plain**: Pipe-friendly text. Auto-selected when stdout is not a TTY.
-- **JSON**: Structured output via `--json`.
+| Key | Action |
+|---|---|
+| `q` / `Esc` | Quit |
+| `Up` / `Down` / `j` / `k` | Scroll |
+| `PgUp` / `PgDn` | Page scroll |
+| `Home` / `End` | Jump to top/bottom |
+| `Tab` / `Shift+Tab` | Next/previous sheet or slide |
 
 ### Examples
 
 ```bash
-# View first 10 rows of an Excel file
+# View first 10 rows of an Excel file in TUI
 officecat budget.xlsx --head 10
 
 # View a specific sheet
@@ -51,8 +63,8 @@ officecat budget.xlsx --list
 # View slide 3 of a presentation
 officecat deck.pptx --slide 3
 
-# Pipe-friendly CSV output
-officecat data.xlsx --plain | grep "revenue"
+# Colored dump piped to less
+officecat report.docx --rich | less -R
 
 # JSON output for scripting
 officecat report.docx --json | jq '.blocks'

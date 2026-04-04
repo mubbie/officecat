@@ -16,7 +16,7 @@ def read_pptx(
 ) -> Presentation:
     from pptx import Presentation as PptxPresentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
-    from pptx.opc.exceptions import PackageNotFoundError
+    from pptx.exc import PackageNotFoundError
 
     try:
         prs = PptxPresentation(str(path))
@@ -56,13 +56,14 @@ def read_pptx(
 
         title_shape = sld.shapes.title
         title_text = title_shape.text.strip() if title_shape else None
+        title_shape_id = title_shape.shape_id if title_shape else None
 
         body: list[str] = []
         images: list[str] = []
 
         for shape in sld.shapes:
             # Skip the title shape to avoid duplication
-            if shape is title_shape:
+            if title_shape_id is not None and shape.shape_id == title_shape_id:
                 continue
 
             st = shape.shape_type

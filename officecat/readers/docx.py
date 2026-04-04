@@ -59,8 +59,14 @@ def read_docx(path: Path, *, head: int | None = None) -> DocxDocument:
 
         style = _classify_style(para.style.name if para.style else None)
         level = 0
-        if para.paragraph_format and para.paragraph_format.level is not None:
-            level = para.paragraph_format.level
+        # List nesting level is stored in the XML numPr element
+        pPr = para._element.pPr
+        if pPr is not None:
+            numPr = pPr.find('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}numPr')
+            if numPr is not None:
+                ilvl = numPr.find('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ilvl')
+                if ilvl is not None and ilvl.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val') is not None:
+                    level = int(ilvl.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val'))
 
         blocks.append(DocxParagraph(text=text, style=style, level=level))
         count += 1

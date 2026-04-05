@@ -1,15 +1,12 @@
-"""CLI entry point — detect, read, render pipeline."""
+"""CLI entry point — convert and render pipeline."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
-from zipfile import BadZipFile
 
 import typer
-
-from officecat.detect import FileFormat, detect_format
 
 app = typer.Typer(add_completion=False)
 
@@ -18,16 +15,15 @@ app = typer.Typer(add_completion=False)
 def run(
     file: Annotated[Path, typer.Argument(help="File to view.")],
     rich: Annotated[bool, typer.Option("--rich", "-r", help="Colored formatted dump (non-interactive).")] = False,
-    plain: Annotated[bool, typer.Option("--plain", "-p", help="Plain text output, no colors.")] = False,
+    plain: Annotated[bool, typer.Option("--plain", "-p", help="Raw markdown text, no colors.")] = False,
     json: Annotated[bool, typer.Option("--json", "-j", help="JSON output.")] = False,
-    head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N items.")] = None,
-    list_only: Annotated[bool, typer.Option("--list", "-l", help="List contents only.")] = False,
-    sheet: Annotated[Optional[str], typer.Option("--sheet", "-s", help="Select sheet by name or 1-based index (xlsx/csv only).")] = None,
-    slide: Annotated[Optional[int], typer.Option("--slide", help="Show only slide N (pptx only).")] = None,
-    headers: Annotated[int, typer.Option("--headers", "-h", help="Promote row N as headers (xlsx/csv, default: 1, 0 to disable).")] = 1,
-    show_all: Annotated[bool, typer.Option("--all", "-a", help="Disable the default row cap.")] = False,
+    head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N lines.")] = None,
+    list_only: Annotated[bool, typer.Option("--list", "-l", help="Show file metadata only.")] = False,
 ) -> None:
-    """View Office files in the terminal."""
+    """View Office files in the terminal.
+
+    Supports .docx, .pptx, .xlsx, .xls, .csv, and .tsv files.
+    """
     # ── Validate flags ──
     output_flags = sum([rich, plain, json])
     if output_flags > 1:
@@ -36,16 +32,9 @@ def run(
     if not file.exists():
         _error(f"File '{file}' not found.")
 
-    fmt = detect_format(file)
-
-    if sheet is not None and fmt not in (FileFormat.XLSX, FileFormat.CSV):
-        _error("--sheet is only valid for xlsx, csv, and tsv files.")
-
-    if slide is not None and fmt != FileFormat.PPTX:
-        _error("--slide is only valid for pptx files.")
-
-    if headers != 1 and fmt not in (FileFormat.XLSX, FileFormat.CSV):
-        _error("--headers is only valid for xlsx, csv, and tsv files.")
+    # ── Validate format ──
+    from officecat.converter import validate_format
+    validate_format(file)
 
     # ── Mode resolution ──
     if json:
@@ -61,35 +50,41 @@ def run(
     else:
         mode = "plain"
 
-    # ── Read data ──
-    try:
-        data = _read(fmt, file, head=head, sheet=sheet, slide=slide, headers=headers, show_all=show_all)
-    except BadZipFile:
-        print(
-            f"Error: '{file.name}' appears to be corrupt or is not a valid {fmt.value} file.",
-            file=sys.stderr,
-        )
-        raise SystemExit(3)
-    except KeyboardInterrupt:
-        raise SystemExit(130)
+    # ── Convert (with spinner for TTY) ──
+    from officecat.converter import convert
 
-    # ── List mode (always non-interactive) ──
+    if sys.stderr.isatty():
+        from rich.console import Console
+
+        console = Console(stderr=True)
+        with console.status(f"Converting {file.name}...", spinner="dots"):
+            result = convert(file)
+    else:
+        result = convert(file)
+
+    if not result.markdown:
+        print("Document is empty.")
+        return
+
+    # ── List mode ──
     if list_only:
-        _list_contents(fmt, data)
+        _list_metadata(file, result)
         return
 
     # ── Render ──
     if mode == "tui":
         from officecat.tui.app import OfficeCatApp
 
-        tui_app = OfficeCatApp(data=data, fmt=fmt)
+        tui_app = OfficeCatApp(source=result.source, markdown=result.markdown)
         tui_app.run()
     elif mode == "rich":
-        _render_with("rich", fmt, data)
+        _render_rich(result.markdown, head=head)
     elif mode == "json":
-        _render_with("json_", fmt, data)
+        from officecat.renderers.json_ import render_json
+        render_json(result.source, result.markdown)
     else:
-        _render_with("plain", fmt, data)
+        from officecat.renderers.plain import render_plain
+        render_plain(result.markdown, head=head)
 
 
 def _error(msg: str) -> None:
@@ -97,64 +92,61 @@ def _error(msg: str) -> None:
     raise SystemExit(1)
 
 
-def _read(
-    fmt: FileFormat,
-    path: Path,
-    *,
-    head: int | None,
-    sheet: str | None,
-    slide: int | None,
-    headers: int,
-    show_all: bool,
-) -> object:
-    if fmt == FileFormat.XLSX:
-        from officecat.readers.xlsx import read_xlsx
-        return read_xlsx(path, head=head, sheet=sheet, headers=headers, show_all=show_all)
-    elif fmt == FileFormat.DOCX:
-        from officecat.readers.docx import read_docx
-        return read_docx(path, head=head)
-    elif fmt == FileFormat.PPTX:
-        from officecat.readers.pptx import read_pptx
-        return read_pptx(path, head=head, slide=slide)
-    elif fmt == FileFormat.CSV:
-        from officecat.readers.csv_ import read_csv
-        return read_csv(path, head=head, headers=headers)
+def _list_metadata(path: Path, result) -> None:
+    """Show file metadata and a heading outline."""
+    import os
+
+    size = os.path.getsize(path)
+    if size < 1024:
+        size_str = f"{size} B"
+    elif size < 1024 * 1024:
+        size_str = f"{size / 1024:.1f} KB"
     else:
-        _error(f"Unhandled format: {fmt}")
+        size_str = f"{size / (1024 * 1024):.1f} MB"
+
+    print(f"File: {path.name}")
+    print(f"Size: {size_str}")
+    print(f"Suffix: {path.suffix}")
+
+    headings = []
+    for line in result.markdown.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            level = 0
+            for ch in stripped:
+                if ch == "#":
+                    level += 1
+                else:
+                    break
+            text = stripped[level:].strip()
+            if text:
+                indent = "  " * (level - 1)
+                headings.append(f"{indent}{text}")
+
+    if headings:
+        print("\nOutline:")
+        for h in headings:
+            print(f"  {h}")
 
 
-def _list_contents(fmt: FileFormat, data: object) -> None:
-    from officecat.models import DocxParagraph
+def _render_rich(markdown_text: str, *, head: int | None = None) -> None:
+    import sys as _sys
 
-    if fmt == FileFormat.XLSX:
-        for name in data.sheet_names:
-            print(name)
-    elif fmt == FileFormat.DOCX:
-        for block in data.blocks:
-            if isinstance(block, DocxParagraph) and block.style.startswith("heading"):
-                depth = block.style[-1]
-                indent = "  " * (int(depth) - 1)
-                print(f"{indent}{block.text}")
-    elif fmt == FileFormat.PPTX:
-        for s in data.slides:
-            title = s.title or "Untitled"
-            print(f"Slide {s.number}: {title}")
-    elif fmt == FileFormat.CSV:
-        if data.headers:
-            print(", ".join(data.headers))
+    if _sys.platform == "win32" and hasattr(_sys.stdout, "reconfigure"):
+        try:
+            _sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
+    from rich.console import Console
+    from rich.markdown import Markdown
 
-def _render_with(renderer_name: str, fmt: FileFormat, data: object) -> None:
-    import importlib
-    renderer = importlib.import_module(f"officecat.renderers.{renderer_name}")
+    text = markdown_text
+    if head is not None:
+        text = "\n".join(text.splitlines()[:head])
 
-    dispatch = {
-        FileFormat.XLSX: renderer.render_xlsx,
-        FileFormat.DOCX: renderer.render_docx,
-        FileFormat.PPTX: renderer.render_pptx,
-        FileFormat.CSV: renderer.render_csv,
-    }
-    dispatch[fmt](data)
+    console = Console()
+    console.print(Markdown(text))
 
 
 def main() -> None:

@@ -1,6 +1,8 @@
 # officecat
 
-A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, and `.csv` files.
+A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, `.csv`, and `.tsv` files.
+
+Powered by Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) for file-to-markdown conversion and [Textual](https://github.com/Textualize/textual) for the interactive TUI.
 
 ## Installation
 
@@ -12,31 +14,29 @@ pip install -e .
 
 ```bash
 officecat report.docx              # interactive TUI viewer
-officecat report.docx --rich       # colored formatted dump (like cat)
+officecat budget.xlsx              # spreadsheet as markdown table
+officecat slides.pptx              # presentation content
+officecat data.csv                 # CSV and TSV too
 officecat budget.xlsx | head       # plain text (auto-detected pipe)
 officecat slides.pptx --json       # JSON output
 ```
 
 ### Output Modes
 
-- **TUI** (default when TTY): Interactive viewer with scrolling, tabs for sheets/slides, and keyboard navigation.
+- **TUI** (default when TTY): Interactive viewer with scrolling, search, and keyboard navigation.
 - **Rich** (`--rich`): Colored, formatted dump to stdout. Non-interactive, pairs well with `less -R`.
-- **Plain** (auto when piped, or `--plain`): Pipe-friendly text output.
-- **JSON** (`--json`): Structured output for scripting.
+- **Plain** (auto when piped, or `--plain`): Raw markdown text for piping to `grep`, `head`, `awk`, etc.
+- **JSON** (`--json`): Structured output for scripting — `{"source": "...", "markdown": "..."}`.
 
 ### Options
 
 | Flag | Short | Description |
 |---|---|---|
 | `--rich` | `-r` | Colored formatted dump (non-interactive) |
-| `--plain` | `-p` | Plain text output, no colors |
+| `--plain` | `-p` | Raw markdown text, no colors |
 | `--json` | `-j` | JSON output |
-| `--head N` | `-n N` | Show first N items (rows/paragraphs/slides) |
-| `--list` | `-l` | List contents only (sheet names, slide titles, heading outline) |
-| `--sheet S` | `-s S` | Select sheet by name or 1-based index (xlsx/csv only) |
-| `--slide N` | | Show only slide N (pptx only) |
-| `--headers N` | `-h N` | Promote row N as column headers (xlsx/csv, default: 1, 0 to disable) |
-| `--all` | `-a` | Disable the default 500-row cap for large spreadsheets |
+| `--head N` | `-n N` | Show first N lines of markdown output |
+| `--list` | `-l` | Show file metadata and heading outline |
 
 ### TUI Key Bindings
 
@@ -46,38 +46,43 @@ officecat slides.pptx --json       # JSON output
 | `Up` / `Down` / `j` / `k` | Scroll |
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to top/bottom |
-| `Tab` / `Shift+Tab` | Next/previous sheet or slide |
+| `/` | Open search |
+| `n` / `N` | Next/previous search result |
+| `Esc` (in search) | Close search |
 
 ### Examples
 
 ```bash
-# View first 10 rows of an Excel file in TUI
+# View first 10 lines of converted markdown
 officecat budget.xlsx --head 10
 
-# View a specific sheet
-officecat budget.xlsx --sheet "Q4 Summary"
-
-# List all sheet names
-officecat budget.xlsx --list
-
-# View slide 3 of a presentation
-officecat deck.pptx --slide 3
+# Heading outline of a document
+officecat report.docx --list
 
 # Colored dump piped to less
 officecat report.docx --rich | less -R
 
 # JSON output for scripting
-officecat report.docx --json | jq '.blocks'
+officecat report.docx --json | jq '.markdown'
+
+# Pipe plain markdown to grep
+officecat data.xlsx --plain | grep "revenue"
 ```
+
+## Supported Formats
+
+- Word (.docx)
+- PowerPoint (.pptx)
+- Excel (.xlsx, .xls)
+- CSV (.csv)
+- TSV (.tsv)
+
+Legacy binary formats (`.doc`, `.ppt`) are not supported — a conversion hint is shown instead.
 
 ## Known Limitations
 
-- DOCX tables are rendered after all paragraphs, not in their original position within the document body.
-- DOCX list detection is style-name-based and may miss some numbered/bulleted lists that use custom styles.
-- PPTX grouped shapes and embedded tables show as placeholders, not full content.
-- PPTX charts and SmartArt are not extracted.
-- XLSX formulas show cached values (last-computed), not the formula strings.
-- No decryption of password-protected files.
-- No OCR for scanned/image-based content.
-- No tracked changes or comment rendering.
-- Legacy binary formats (`.doc`, `.ppt`, `.xls`) are not supported — a conversion hint is shown instead.
+- All content is rendered as markdown — spreadsheet tables are markdown tables, not interactive grids.
+- Layout fidelity is limited — you see the content, not the original formatting or spatial arrangement.
+- XLSX formulas show cached values, not formula strings.
+- Password-protected/encrypted files are not supported.
+- Very large files may take a moment to convert (a spinner is shown while loading).

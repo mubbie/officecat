@@ -1,165 +1,93 @@
-"""Textual TUI app for officecat — renders markdown in an interactive viewer."""
+"""Textual TUI app for officecat — renders markdown with MarkdownViewer."""
 
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll
-from textual.message import Message
-from textual.widgets import Footer, Header, Input, Markdown, Static
+from textual.containers import Horizontal
+from textual.screen import ModalScreen
+from textual.widgets import Footer, Header, Input, Label, MarkdownViewer
 
 
-class SearchBar(Static):
-    """Inline search bar that docks at the bottom."""
+class SearchScreen(ModalScreen[None]):
+    """Modal search overlay — appears at the bottom, returns focus cleanly."""
 
     DEFAULT_CSS = """
-    SearchBar {
+    SearchScreen {
+        align: center bottom;
+    }
+    #search-bar {
         dock: bottom;
-        height: auto;
-        max-height: 3;
-        display: none;
-        padding: 0 1;
+        width: 100%;
+        height: 1;
         background: $surface;
+        padding: 0 1;
     }
-    SearchBar.visible {
-        display: block;
+    #search-bar Label {
+        width: auto;
+        color: $accent;
     }
-    SearchBar Input {
+    #search-bar Input {
         width: 1fr;
         border: none;
         height: 1;
         padding: 0;
+        background: $surface;
     }
-    SearchBar .search-status {
+    #search-bar .search-count {
+        width: auto;
         color: $text-muted;
-        height: 1;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        yield Input(placeholder="Search...", id="search-input")
-        yield Static("", classes="search-status", id="search-status")
-
-    def open(self) -> None:
-        self.add_class("visible")
-        inp = self.query_one("#search-input", Input)
-        inp.value = ""
-        inp.focus()
-        self._update_status("")
-
-    def close(self) -> None:
-        self.remove_class("visible")
-        self._update_status("")
-
-    @property
-    def is_open(self) -> bool:
-        return self.has_class("visible")
-
-    def _update_status(self, text: str) -> None:
-        self.query_one("#search-status", Static).update(text)
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Notify the app that the search query changed."""
-        self.post_message(SearchQueryChanged(event.value))
-
-    def on_key(self, event) -> None:
-        if event.key == "escape":
-            self.close()
-            self.post_message(SearchQueryChanged(""))
-            event.stop()
-        elif event.key == "enter":
-            self.post_message(SearchNextRequested())
-            event.stop()
-
-
-class SearchQueryChanged(Message):
-    """Posted when the search query changes."""
-
-    def __init__(self, query: str) -> None:
-        super().__init__()
-        self.query = query
-
-
-class SearchNextRequested(Message):
-    """Posted when the user presses Enter in the search bar."""
-    pass
-
-
-class OfficeCatApp(App):
-    """Interactive terminal viewer for Office files."""
-
-    CSS = """
-    #md-scroll {
-        scrollbar-gutter: stable;
-    }
-    .search-match {
-        background: $warning 40%;
     }
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
-        Binding("escape", "escape", "Back", show=False),
-        Binding("slash", "open_search", "Search", show=True),
-        Binding("n", "next_match", "Next", show=False),
-        Binding("shift+n", "prev_match", "Prev", show=False),
+        Binding("escape", "close", "Close", show=False),
     ]
 
-    def __init__(self, source: str, markdown: str, **kwargs: object) -> None:
-        self._source = source
-        self._markdown = markdown
-        self._search_matches: list = []
+    def __init__(self) -> None:
+        super().__init__()
+        self._matches: list = []
         self._match_index: int = -1
-        super().__init__(**kwargs)
-        self.title = f"officecat — {self._source}"
 
     def compose(self) -> ComposeResult:
-        yield Header()
-        with VerticalScroll(id="md-scroll"):
-            yield Markdown(self._markdown, id="md-view")
-        yield SearchBar()
-        yield Footer()
+        with Horizontal(id="search-bar"):
+            yield Label(" / ")
+            yield Input(placeholder="Search...", id="search-input")
+            yield Label("", id="search-count", classes="search-count")
 
-    def action_open_search(self) -> None:
-        self.query_one(SearchBar).open()
+    def on_mount(self) -> None:
+        self.query_one("#search-input", Input).focus()
 
-    def action_escape(self) -> None:
-        bar = self.query_one(SearchBar)
-        if bar.is_open:
-            bar.close()
-            self._clear_search()
-        else:
-            self.exit()
-
-    def action_next_match(self) -> None:
-        bar = self.query_one(SearchBar)
-        if bar.is_open and self._search_matches:
-            self._match_index = (self._match_index + 1) % len(self._search_matches)
-            self._scroll_to_match()
-
-    def action_prev_match(self) -> None:
-        bar = self.query_one(SearchBar)
-        if bar.is_open and self._search_matches:
-            self._match_index = (self._match_index - 1) % len(self._search_matches)
-            self._scroll_to_match()
-
-    def on_search_query_changed(self, event: SearchQueryChanged) -> None:
-        self._clear_search()
-        query = event.query.strip()
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self._clear_highlights()
+        query = event.value.strip()
         if not query:
-            self.query_one(SearchBar)._update_status("")
+            self._update_count("")
             return
         self._find_matches(query)
 
-    def on_search_next_requested(self, event: SearchNextRequested) -> None:
-        self.action_next_match()
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter key — go to next match."""
+        self._next_match()
+
+    def on_key(self, event) -> None:
+        # Ctrl+N / Ctrl+P for next/prev without leaving input
+        if event.key == "ctrl+n":
+            self._next_match()
+            event.stop()
+        elif event.key == "ctrl+p":
+            self._prev_match()
+            event.stop()
+
+    def action_close(self) -> None:
+        self._clear_highlights()
+        self.dismiss(None)
 
     def _find_matches(self, query: str) -> None:
-        """Find markdown blocks containing the query and highlight them."""
         query_lower = query.lower()
-        md_widget = self.query_one("#md-view", Markdown)
+        viewer = self.app.query_one(MarkdownViewer)
+        md_widget = viewer.document
 
-        # Search through the rendered child widgets of the Markdown widget
         for child in md_widget.children:
             try:
                 rendered = child.render()
@@ -168,26 +96,78 @@ class OfficeCatApp(App):
                 continue
             if query_lower in text.lower():
                 child.add_class("search-match")
-                self._search_matches.append(child)
+                self._matches.append(child)
 
-        bar = self.query_one(SearchBar)
-        if self._search_matches:
+        if self._matches:
             self._match_index = 0
-            self._scroll_to_match()
+            self._scroll_to_current()
         else:
-            bar._update_status("No matches")
+            self._update_count("No matches")
 
-    def _scroll_to_match(self) -> None:
-        if 0 <= self._match_index < len(self._search_matches):
-            widget = self._search_matches[self._match_index]
-            widget.scroll_visible(animate=False)
-            bar = self.query_one(SearchBar)
-            bar._update_status(
-                f"{self._match_index + 1}/{len(self._search_matches)}"
-            )
+    def _next_match(self) -> None:
+        if not self._matches:
+            return
+        self._match_index = (self._match_index + 1) % len(self._matches)
+        self._scroll_to_current()
 
-    def _clear_search(self) -> None:
-        for w in self._search_matches:
+    def _prev_match(self) -> None:
+        if not self._matches:
+            return
+        self._match_index = (self._match_index - 1) % len(self._matches)
+        self._scroll_to_current()
+
+    def _scroll_to_current(self) -> None:
+        if 0 <= self._match_index < len(self._matches):
+            self._matches[self._match_index].scroll_visible(animate=False)
+            self._update_count(f"{self._match_index + 1}/{len(self._matches)}")
+
+    def _clear_highlights(self) -> None:
+        for w in self._matches:
             w.remove_class("search-match")
-        self._search_matches = []
+        self._matches = []
         self._match_index = -1
+
+    def _update_count(self, text: str) -> None:
+        self.query_one("#search-count", Label).update(text)
+
+
+class OfficeCatApp(App):
+    """Interactive terminal viewer for Office files."""
+
+    CSS = """
+    .search-match {
+        background: $warning 40%;
+    }
+    MarkdownViewer {
+        height: 1fr;
+    }
+    """
+
+    BINDINGS = [
+        Binding("q", "quit", "Quit"),
+        Binding("t", "toggle_toc", "TOC", show=True),
+        Binding("slash", "search", "Search", show=True),
+    ]
+
+    def __init__(self, source: str, markdown: str, **kwargs: object) -> None:
+        self._source = source
+        self._markdown = markdown
+        super().__init__(**kwargs)
+        self.title = f"officecat — {self._source}"
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield MarkdownViewer(
+            self._markdown,
+            show_table_of_contents=True,
+            open_links=False,
+            id="viewer",
+        )
+        yield Footer()
+
+    def action_toggle_toc(self) -> None:
+        viewer = self.query_one(MarkdownViewer)
+        viewer.show_table_of_contents = not viewer.show_table_of_contents
+
+    def action_search(self) -> None:
+        self.push_screen(SearchScreen())

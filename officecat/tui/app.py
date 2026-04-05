@@ -18,24 +18,26 @@ class SearchBar(Widget):
         display: none;
         background: $panel;
         layout: horizontal;
-        padding: 1 1 0 1;
+        padding: 0 1;
     }
     SearchBar.open {
         display: block;
     }
     SearchBar #search-prompt {
         width: 3;
-        height: 1;
+        height: 3;
+        content-align: left middle;
         color: $accent;
-        padding: 0;
     }
     SearchBar Input {
         width: 1fr;
-        height: 1;
+        color: $text;
+        background: $surface;
     }
     SearchBar #search-count {
         width: auto;
-        height: 1;
+        height: 3;
+        content-align: left middle;
         color: $text-muted;
         padding: 0 1;
     }

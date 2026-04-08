@@ -12,7 +12,10 @@ license = "MIT"
 dependencies = [
     "typer>=0.9",
     "textual>=0.50",
-    "markitdown[docx,pptx,xlsx,xls]",
+    "python-docx>=1.0",
+    "python-pptx>=0.6",
+    "python-calamine>=0.2",
+    "rich",
 ]
 
 [project.scripts]

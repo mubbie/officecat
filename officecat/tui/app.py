@@ -1,11 +1,12 @@
-"""Textual TUI app for officecat — renders markdown with MarkdownViewer."""
+"""Textual TUI app for officecat — full-screen markdown viewer with search."""
 
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.containers import VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Footer, Header, Input, Label, MarkdownViewer
+from textual.widgets import Footer, Header, Input, Label, Markdown
 
 
 class SearchBar(Widget):
@@ -73,14 +74,13 @@ class OfficeCatApp(App):
     .search-match {
         background: $warning 40%;
     }
-    MarkdownViewer {
+    #md-scroll {
         height: 1fr;
     }
     """
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
-        Binding("t", "toggle_toc", "TOC", show=True),
         Binding("slash", "open_search", "Search", show=True),
     ]
 
@@ -94,25 +94,15 @@ class OfficeCatApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield MarkdownViewer(
-            self._markdown,
-            show_table_of_contents=True,
-            open_links=False,
-            id="viewer",
-        )
+        with VerticalScroll(id="md-scroll"):
+            yield Markdown(self._markdown, id="md-view")
         yield SearchBar()
         yield Footer()
-
-    def action_toggle_toc(self) -> None:
-        viewer = self.query_one(MarkdownViewer)
-        viewer.show_table_of_contents = not viewer.show_table_of_contents
 
     def action_open_search(self) -> None:
         bar = self.query_one(SearchBar)
         if not bar.is_open:
             bar.open()
-
-    # ── Search input events (bubble up from SearchBar) ──
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id != "search-input":
@@ -133,7 +123,6 @@ class OfficeCatApp(App):
         bar = self.query_one(SearchBar)
         if not bar.is_open:
             return
-
         if event.key == "escape":
             self._close_search()
             event.stop()
@@ -141,14 +130,12 @@ class OfficeCatApp(App):
 
     def _close_search(self) -> None:
         self._clear_highlights()
-        bar = self.query_one(SearchBar)
-        bar.close()
-        self.query_one(MarkdownViewer).focus()
+        self.query_one(SearchBar).close()
+        self.query_one("#md-scroll").focus()
 
     def _find_matches(self, query: str) -> None:
         query_lower = query.lower()
-        viewer = self.query_one(MarkdownViewer)
-        md_widget = viewer.document
+        md_widget = self.query_one("#md-view", Markdown)
 
         for child in md_widget.children:
             try:
@@ -171,12 +158,6 @@ class OfficeCatApp(App):
         if not self._search_matches:
             return
         self._match_index = (self._match_index + 1) % len(self._search_matches)
-        self._scroll_to_match()
-
-    def _prev_match(self) -> None:
-        if not self._search_matches:
-            return
-        self._match_index = (self._match_index - 1) % len(self._search_matches)
         self._scroll_to_match()
 
     def _scroll_to_match(self) -> None:

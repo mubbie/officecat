@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 
-def render_plain(markdown_text: str, head: int | None = None) -> None:
+def render(markdown_text: str, head: int | None = None) -> None:
+    """Print raw markdown text to stdout."""
     lines = markdown_text.splitlines()
     if head is not None:
         lines = lines[:head]

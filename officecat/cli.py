@@ -1,4 +1,4 @@
-"""CLI entry point — convert and render pipeline."""
+"""CLI entry point — read and render pipeline."""
 
 from __future__ import annotations
 
@@ -10,21 +10,27 @@ import typer
 
 app = typer.Typer(add_completion=False)
 
+# Formats that support tabular flags
+_TABULAR_FMTS = {"xlsx", "csv"}
+
 
 @app.command()
 def run(
     file: Annotated[Path, typer.Argument(help="File to view.")],
-    tui: Annotated[bool, typer.Option("--tui", "-t", help="Interactive TUI viewer with search and TOC.")] = False,
+    tui: Annotated[bool, typer.Option("--tui", "-t", help="Interactive full-screen viewer.")] = False,
     plain: Annotated[bool, typer.Option("--plain", "-p", help="Raw markdown text, no colors.")] = False,
     json: Annotated[bool, typer.Option("--json", "-j", help="JSON output.")] = False,
-    head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N lines.")] = None,
-    list_only: Annotated[bool, typer.Option("--list", "-l", help="Show file metadata only.")] = False,
+    head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N lines (or items for readers).")] = None,
+    sheet: Annotated[Optional[str], typer.Option("--sheet", "-s", help="Select sheet by name or 1-based index (xlsx only).")] = None,
+    slide: Annotated[Optional[int], typer.Option("--slide", help="Show only slide N (pptx only).")] = None,
+    headers: Annotated[int, typer.Option("--headers", "-h", help="Promote row N as headers (xlsx/csv, default: 1, 0 to disable).")] = 1,
+    show_all: Annotated[bool, typer.Option("--all", "-a", help="Disable the default row cap.")] = False,
 ) -> None:
     """View Office files in the terminal.
 
-    Supports .docx, .pptx, .xlsx, .xls, .csv, and .tsv files.
+    Supports .docx, .pptx, .xlsx, .csv, and .tsv files.
     """
-    # ── Validate flags ──
+    # ── Validate output flags ──
     output_flags = sum([tui, plain, json])
     if output_flags > 1:
         _error("--tui, --plain, and --json are mutually exclusive.")
@@ -33,8 +39,17 @@ def run(
         _error(f"File '{file}' not found.")
 
     # ── Validate format ──
-    from officecat.converter import validate_format
-    validate_format(file)
+    from officecat.detect import FileFormat, detect_format
+    fmt = detect_format(file)
+
+    # ── Validate format-specific flags ──
+    fmt_name = fmt.value
+    if sheet is not None and fmt_name not in ("xlsx", "csv"):
+        _error("--sheet is only valid for xlsx, csv, and tsv files.")
+    if slide is not None and fmt_name != "pptx":
+        _error("--slide is only valid for pptx files.")
+    if headers != 1 and fmt_name not in ("xlsx", "csv"):
+        _error("--headers is only valid for xlsx, csv, and tsv files.")
 
     # ── Mode resolution ──
     if json:
@@ -43,110 +58,70 @@ def run(
         mode = "plain"
     elif tui:
         mode = "tui"
-    elif list_only:
-        mode = "plain"
     elif sys.stdout.isatty():
         mode = "rich"
     else:
         mode = "plain"
 
+    # ── Build reader options ──
+    reader_opts: dict = {}
+    if fmt_name in ("xlsx", "csv"):
+        reader_opts["headers"] = headers
+        reader_opts["show_all"] = show_all
+        if sheet is not None:
+            reader_opts["sheet"] = sheet
+    if fmt_name == "pptx" and slide is not None:
+        reader_opts["slide"] = slide
+    if head is not None and fmt_name in ("docx", "pptx"):
+        reader_opts["head"] = head
+
+    # For tabular formats, pass head as row limit to reader
+    if head is not None and fmt_name in ("xlsx", "csv"):
+        reader_opts["head"] = head
+
     # ── Convert (with spinner for TTY) ──
-    from officecat.converter import convert
+    from officecat.readers import convert
 
-    if sys.stderr.isatty():
+    if sys.stderr.isatty() and mode != "tui":
         from rich.console import Console
-
         console = Console(stderr=True)
-        with console.status(f"Converting {file.name}...", spinner="dots"):
-            result = convert(file)
+        with console.status(f"Reading {file.name}...", spinner="dots"):
+            markdown = convert(file, **reader_opts)
     else:
-        result = convert(file)
+        markdown = convert(file, **reader_opts)
 
-    if not result.markdown:
+    if not markdown or not markdown.strip():
         print("Document is empty.")
         return
 
-    # ── List mode ──
-    if list_only:
-        _list_metadata(file, result)
-        return
+    # ── TUI guardrail for large tables ──
+    if mode == "tui" and show_all and fmt_name in ("xlsx", "csv"):
+        line_count = markdown.count("\n")
+        if line_count > 1000:
+            # Truncate to ~1000 lines for TUI performance
+            lines = markdown.splitlines()
+            markdown = "\n".join(lines[:1000])
+            markdown += "\n\n*TUI limited to first 1000 lines. Use --plain or --rich with --all to view everything.*"
 
     # ── Render ──
     if mode == "tui":
         from officecat.tui.app import OfficeCatApp
-
-        tui_app = OfficeCatApp(source=result.source, markdown=result.markdown)
+        tui_app = OfficeCatApp(source=str(file), markdown=markdown)
         tui_app.run()
     elif mode == "rich":
-        _render_rich(result.markdown, head=head)
+        from officecat.renderers.rich import render
+        render(markdown, head=head)
     elif mode == "json":
-        from officecat.renderers.json_ import render_json
-        render_json(result.source, result.markdown)
+        from officecat.renderers.json_ import render
+        render(str(file), markdown)
     else:
-        from officecat.renderers.plain import render_plain
-        render_plain(result.markdown, head=head)
+        from officecat.renderers.plain import render
+        render(markdown, head=head)
 
 
 def _error(msg: str) -> None:
     print(f"Error: {msg}", file=sys.stderr)
     raise SystemExit(1)
-
-
-def _list_metadata(path: Path, result) -> None:
-    """Show file metadata and a heading outline."""
-    import os
-
-    size = os.path.getsize(path)
-    if size < 1024:
-        size_str = f"{size} B"
-    elif size < 1024 * 1024:
-        size_str = f"{size / 1024:.1f} KB"
-    else:
-        size_str = f"{size / (1024 * 1024):.1f} MB"
-
-    print(f"File: {path.name}")
-    print(f"Size: {size_str}")
-    print(f"Suffix: {path.suffix}")
-
-    headings = []
-    for line in result.markdown.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            level = 0
-            for ch in stripped:
-                if ch == "#":
-                    level += 1
-                else:
-                    break
-            text = stripped[level:].strip()
-            if text:
-                indent = "  " * (level - 1)
-                headings.append(f"{indent}{text}")
-
-    if headings:
-        print("\nOutline:")
-        for h in headings:
-            print(f"  {h}")
-
-
-def _render_rich(markdown_text: str, *, head: int | None = None) -> None:
-    import sys as _sys
-
-    if _sys.platform == "win32" and hasattr(_sys.stdout, "reconfigure"):
-        try:
-            _sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
-
-    from rich.console import Console
-    from rich.markdown import Markdown
-
-    text = markdown_text
-    if head is not None:
-        text = "\n".join(text.splitlines()[:head])
-
-    console = Console()
-    console.print(Markdown(text))
 
 
 def main() -> None:

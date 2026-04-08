@@ -25,7 +25,7 @@ officecat slides.pptx --json       # JSON output
 ### Output Modes
 
 - **Rich** (default): Colored, formatted output to stdout. Works with `less -R`.
-- **TUI** (`--tui`): Full-screen interactive viewer with scrolling and search.
+- **TUI** (`--tui`): Full-screen interactive viewer with scrolling.
 - **Plain** (auto when piped, or `--plain`): Raw markdown for piping to `grep`, `head`, `awk`.
 - **JSON** (`--json`): `{"source": "...", "markdown": "..."}` for scripting.
 
@@ -46,12 +46,10 @@ officecat slides.pptx --json       # JSON output
 
 | Key | Action |
 |---|---|
-| `q` / `Esc` | Quit |
-| `/` | Open search |
-| `Enter` | Next search result |
-| `Esc` (in search) | Close search |
+| `q` | Quit |
 | `Up` / `Down` | Scroll |
 | `PgUp` / `PgDn` | Page scroll |
+| `Home` / `End` | Jump to top/bottom |
 
 ### Examples
 
@@ -80,22 +78,22 @@ officecat data.xlsx --plain | grep "revenue"
 
 ## Supported Formats
 
-- Word (.docx) — headings, paragraphs, lists, tables in document order
-- PowerPoint (.pptx) — slides, shapes, images, speaker notes, hidden slides
-- Excel (.xlsx) — all sheets, row cap, header promotion
-- CSV (.csv) — auto-delimited
-- TSV (.tsv) — tab-delimited
+- Word (.docx): headings, paragraphs, lists, tables in document order
+- PowerPoint (.pptx): slides, shapes, images, speaker notes, hidden slides
+- Excel (.xlsx): all sheets, row cap, header promotion
+- CSV (.csv): auto-delimited
+- TSV (.tsv): tab-delimited
 
 Legacy binary formats (`.doc`, `.ppt`, `.xls`) show a conversion hint.
 
 ## Known Limitations
 
-- All content is rendered as markdown — spreadsheet tables are markdown tables, not interactive grids.
+- All content is rendered as markdown. Spreadsheet tables are markdown tables, not interactive grids.
 - DOCX list detection is style-name-based and may miss custom list styles.
 - PPTX grouped shapes and embedded tables show as placeholders.
 - PPTX charts and SmartArt are not extracted.
 - XLSX formulas show cached/computed values, not formula strings.
 - Large spreadsheets are capped at 500 rows by default. Use `--all` to show everything.
-- TUI enforces a 1000-line cap with `--all` for performance. Use `--plain` or `--rich` for full output.
+- TUI enforces a 1000-line cap with `--all` for performance. Use `--plain` for full output.
 - No decryption of password-protected files.
 - Legacy binary formats (.doc, .ppt, .xls) are not supported.

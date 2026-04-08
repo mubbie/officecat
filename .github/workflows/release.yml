@@ -18,10 +18,10 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Get version from pyproject.toml
+      - name: Get version from __init__.py
         id: version
         run: |
-          VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '__version__' officecat/__init__.py | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 

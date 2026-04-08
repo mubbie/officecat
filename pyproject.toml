@@ -1,6 +1,6 @@
 [project]
 name = "officecat"
-version = "0.2.0"
+dynamic = ["version"]
 description = "View Office files in the terminal"
 readme = "README.md"
 license = {text = "MIT"}
@@ -46,6 +46,9 @@ dev = ["pytest", "ruff", "mypy"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "officecat/__init__.py"
 
 [tool.ruff]
 target-version = "py310"

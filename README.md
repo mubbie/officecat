@@ -1,4 +1,4 @@
-# officecat
+# officecat 🐱
 
 A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, `.csv`, and `.tsv` files.
 

@@ -37,6 +37,12 @@ officecat --version                # show version
 officecat update                   # update to latest version
 ```
 
+`ocat` is available as a shorter alias:
+
+```bash
+ocat report.docx
+```
+
 Files must be local. OneDrive/SharePoint files that are "cloud-only" (not synced) will fail to open. Right-click the file and choose "Always keep on this device" to sync it first.
 
 ### Output Modes

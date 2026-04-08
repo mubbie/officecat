@@ -1,6 +1,6 @@
 [project]
 name = "officecat"
-version = "0.1.0"
+version = "0.2.0"
 description = "View Office files in the terminal"
 readme = "README.md"
 license = {text = "MIT"}
@@ -38,7 +38,7 @@ Repository = "https://github.com/mubbie/officecat"
 Issues = "https://github.com/mubbie/officecat/issues"
 
 [project.scripts]
-officecat = "officecat.cli:main"
+officecat = "officecat.cli:cli_entry"
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]

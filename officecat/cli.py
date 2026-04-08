@@ -8,14 +8,31 @@ from typing import Annotated, Optional
 
 import typer
 
-app = typer.Typer(add_completion=False)
+from officecat import __version__
 
-# Formats that support tabular flags
-_TABULAR_FMTS = {"xlsx", "csv"}
+app = typer.Typer(
+    add_completion=False,
+    invoke_without_command=True,
+    no_args_is_help=True,
+)
 
 
-@app.command()
-def run(
+@app.callback()
+def main(
+    ctx: typer.Context,
+    version: Annotated[
+        Optional[bool],
+        typer.Option("--version", "-v", help="Show version."),
+    ] = None,
+) -> None:
+    """View Office files in the terminal."""
+    if version:
+        print(f"officecat {__version__}")
+        raise typer.Exit()
+
+
+@app.command(hidden=True)
+def view(
     file: Annotated[
         Path, typer.Argument(help="File to view.")
     ],
@@ -29,7 +46,8 @@ def run(
         bool, typer.Option("--json", "-j", help="JSON output.")
     ] = False,
     head: Annotated[
-        Optional[int], typer.Option("--head", "-n", help="Show first N lines.")
+        Optional[int],
+        typer.Option("--head", "-n", help="Show first N lines."),
     ] = None,
     sheet: Annotated[
         Optional[str],
@@ -41,16 +59,94 @@ def run(
     ] = None,
     headers: Annotated[
         int,
-        typer.Option("--headers", "-h", help="Row N as headers (default: 1)."),
+        typer.Option(
+            "--headers", "-h", help="Row N as headers (default: 1)."
+        ),
     ] = 1,
     show_all: Annotated[
         bool, typer.Option("--all", "-a", help="Disable the row cap.")
     ] = False,
 ) -> None:
-    """View Office files in the terminal.
+    """View an Office file."""
+    _view_file(
+        file,
+        tui=tui,
+        plain=plain,
+        json=json,
+        head=head,
+        sheet=sheet,
+        slide=slide,
+        headers=headers,
+        show_all=show_all,
+    )
 
-    Supports .docx, .pptx, .xlsx, .csv, and .tsv files.
-    """
+
+@app.command()
+def update() -> None:
+    """Update officecat to the latest version."""
+    import subprocess
+
+    from rich.console import Console
+
+    console = Console(stderr=True)
+
+    console.print(f"[dim]Current version: {__version__}[/dim]")
+    console.print("[dim]Checking for updates...[/dim]")
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "pip", "install",
+                "--upgrade", "officecat",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except Exception as e:
+        console.print(f"[red]Update failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    if result.returncode != 0:
+        console.print(f"[red]Update failed:[/red]\n{result.stderr}")
+        raise typer.Exit(1)
+
+    if "already satisfied" in result.stdout.lower():
+        console.print(
+            f"[green]Already up to date ({__version__}).[/green]"
+        )
+    else:
+        # Re-check version after upgrade
+        try:
+            ver_result = subprocess.run(
+                [
+                    sys.executable, "-c",
+                    "from officecat import __version__; "
+                    "print(__version__)",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            new_ver = ver_result.stdout.strip()
+        except Exception:
+            new_ver = "unknown"
+        console.print(
+            f"[green]Updated: {__version__} -> {new_ver}[/green]"
+        )
+
+
+def _view_file(
+    file: Path,
+    *,
+    tui: bool,
+    plain: bool,
+    json: bool,
+    head: int | None,
+    sheet: str | None,
+    slide: int | None,
+    headers: int,
+    show_all: bool,
+) -> None:
+    """Core file viewing logic."""
     # ── Validate output flags ──
     output_flags = sum([tui, plain, json])
     if output_flags > 1:
@@ -61,6 +157,7 @@ def run(
 
     # ── Validate format ──
     from officecat.detect import detect_format
+
     fmt = detect_format(file)
 
     # ── Validate format-specific flags ──
@@ -95,8 +192,6 @@ def run(
         reader_opts["slide"] = slide
     if head is not None and fmt_name in ("docx", "pptx"):
         reader_opts["head"] = head
-
-    # For tabular formats, pass head as row limit to reader
     if head is not None and fmt_name in ("xlsx", "csv"):
         reader_opts["head"] = head
 
@@ -105,8 +200,11 @@ def run(
 
     if sys.stderr.isatty() and mode != "tui":
         from rich.console import Console
+
         console = Console(stderr=True)
-        with console.status(f"Reading {file.name}...", spinner="dots"):
+        with console.status(
+            f"Reading {file.name}...", spinner="dots"
+        ):
             markdown = convert(file, **reader_opts)
     else:
         markdown = convert(file, **reader_opts)
@@ -119,7 +217,6 @@ def run(
     if mode == "tui" and show_all and fmt_name in ("xlsx", "csv"):
         line_count = markdown.count("\n")
         if line_count > 1000:
-            # Truncate to ~1000 lines for TUI performance
             lines = markdown.splitlines()
             markdown = "\n".join(lines[:1000])
             markdown += (
@@ -130,16 +227,20 @@ def run(
     # ── Render ──
     if mode == "tui":
         from officecat.tui.app import OfficeCatApp
+
         tui_app = OfficeCatApp(source=str(file), markdown=markdown)
         tui_app.run()
     elif mode == "rich":
         from officecat.renderers import rich as _rich
+
         _rich.render(markdown, head=head)
     elif mode == "json":
         from officecat.renderers import json_ as _json
+
         _json.render(str(file), markdown)
     else:
         from officecat.renderers import plain as _plain
+
         _plain.render(markdown, head=head)
 
 
@@ -148,5 +249,15 @@ def _error(msg: str) -> None:
     raise SystemExit(1)
 
 
-def main() -> None:
+def cli_entry() -> None:
+    """Entry point — route bare file args to view command."""
+    # If the first arg looks like a file (not a subcommand),
+    # inject "view" so typer routes it correctly.
+    if len(sys.argv) > 1:
+        first = sys.argv[1]
+        if (
+            first not in ("update", "--help", "--version", "-v")
+            and not first.startswith("--")
+        ):
+            sys.argv.insert(1, "view")
     app()

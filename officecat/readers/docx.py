@@ -59,6 +59,40 @@ def _table_to_markdown(table) -> str:
     return "\n".join(lines)
 
 
+def _report_open_error(path: Path) -> None:
+    """Print a helpful error for files that can't be opened."""
+    import zipfile
+
+    on_onedrive = "onedrive" in str(path).lower()
+    try:
+        with zipfile.ZipFile(str(path)) as zf:
+            zf.namelist()
+    except zipfile.BadZipFile:
+        if on_onedrive:
+            print(
+                f"Error: '{path.name}' could not be opened.\n"
+                f"This file appears to be on OneDrive and may "
+                f"not be downloaded yet. Try opening it first.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"Error: '{path.name}' appears to be corrupt "
+                f"or is not a valid {path.suffix} file.",
+                file=sys.stderr,
+            )
+    except Exception:
+        print(
+            f"Error: '{path.name}' appears to be corrupt or invalid.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"Error: '{path.name}' appears to be corrupt or invalid.",
+            file=sys.stderr,
+        )
+
+
 def to_markdown(path: Path, *, head: int | None = None, **_kwargs) -> str:
     """Convert a docx file to markdown, preserving paragraph/table order."""
     from docx import Document
@@ -69,10 +103,7 @@ def to_markdown(path: Path, *, head: int | None = None, **_kwargs) -> str:
     try:
         doc = Document(str(path))
     except PackageNotFoundError:
-        print(
-            f"Error: '{path.name}' appears to be corrupt or invalid.",
-            file=sys.stderr,
-        )
+        _report_open_error(path)
         raise SystemExit(3)
     except Exception as e:
         msg = str(e).lower()

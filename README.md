@@ -7,6 +7,14 @@ Every supported format is converted to markdown internally, then rendered throug
 ## Installation
 
 ```bash
+pip install officecat
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/mubbie/officecat.git
+cd officecat
 pip install -e .
 ```
 

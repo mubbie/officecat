@@ -2,6 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/officecat)](https://pypi.org/project/officecat/)
 [![CI](https://github.com/mubbie/officecat/actions/workflows/ci.yml/badge.svg)](https://github.com/mubbie/officecat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/mubbie/officecat/blob/main/LICENSE)
 
 A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, `.csv`, and `.tsv` files.
 
@@ -31,7 +32,11 @@ officecat data.csv                 # CSV and TSV
 officecat report.docx --tui        # interactive full-screen viewer
 officecat budget.xlsx | head       # plain text (auto-detected pipe)
 officecat slides.pptx --json       # JSON output
+officecat --version                # show version
+officecat update                   # update to latest version
 ```
+
+Files must be local. OneDrive/SharePoint files that are "cloud-only" (not synced) will fail to open. Right-click the file and choose "Always keep on this device" to sync it first.
 
 ### Output Modes
 
@@ -52,6 +57,7 @@ officecat slides.pptx --json       # JSON output
 | `--slide N` | | Show only slide N (pptx only) |
 | `--headers N` | `-h N` | Promote row N as headers (xlsx/csv, default: 1, 0 to disable) |
 | `--all` | `-a` | Disable the default 500-row cap |
+| `--version` | `-v` | Show version |
 
 ### TUI Key Bindings
 
@@ -85,6 +91,9 @@ officecat report.docx --json | jq '.markdown'
 
 # Pipe to grep
 officecat data.xlsx --plain | grep "revenue"
+
+# Self-update
+officecat update
 ```
 
 ## Supported Formats
@@ -99,6 +108,7 @@ Legacy binary formats (`.doc`, `.ppt`, `.xls`) show a conversion hint.
 
 ## Known Limitations
 
+- Files must be local. Remote/cloud-only files (OneDrive, SharePoint) need to be synced first.
 - All content is rendered as markdown. Spreadsheet tables are markdown tables, not interactive grids.
 - DOCX list detection is style-name-based and may miss custom list styles.
 - PPTX grouped shapes and embedded tables show as placeholders.
@@ -108,3 +118,7 @@ Legacy binary formats (`.doc`, `.ppt`, `.xls`) show a conversion hint.
 - TUI enforces a 1000-line cap with `--all` for performance. Use `--plain` for full output.
 - No decryption of password-protected files.
 - Legacy binary formats (.doc, .ppt, .xls) are not supported.
+
+## License
+
+[MIT](LICENSE)

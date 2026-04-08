@@ -14,7 +14,7 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def run(
     file: Annotated[Path, typer.Argument(help="File to view.")],
-    rich: Annotated[bool, typer.Option("--rich", "-r", help="Colored formatted dump (non-interactive).")] = False,
+    tui: Annotated[bool, typer.Option("--tui", "-t", help="Interactive TUI viewer with search and TOC.")] = False,
     plain: Annotated[bool, typer.Option("--plain", "-p", help="Raw markdown text, no colors.")] = False,
     json: Annotated[bool, typer.Option("--json", "-j", help="JSON output.")] = False,
     head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N lines.")] = None,
@@ -25,9 +25,9 @@ def run(
     Supports .docx, .pptx, .xlsx, .xls, .csv, and .tsv files.
     """
     # ── Validate flags ──
-    output_flags = sum([rich, plain, json])
+    output_flags = sum([tui, plain, json])
     if output_flags > 1:
-        _error("--rich, --plain, and --json are mutually exclusive.")
+        _error("--tui, --plain, and --json are mutually exclusive.")
 
     if not file.exists():
         _error(f"File '{file}' not found.")
@@ -41,12 +41,12 @@ def run(
         mode = "json"
     elif plain:
         mode = "plain"
-    elif rich:
-        mode = "rich"
+    elif tui:
+        mode = "tui"
     elif list_only:
         mode = "plain"
     elif sys.stdout.isatty():
-        mode = "tui"
+        mode = "rich"
     else:
         mode = "plain"
 

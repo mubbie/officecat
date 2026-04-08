@@ -13,18 +13,19 @@ pip install -e .
 ## Usage
 
 ```bash
-officecat report.docx              # interactive TUI viewer
+officecat report.docx              # colored formatted output (default)
 officecat budget.xlsx              # spreadsheet as markdown table
 officecat slides.pptx              # presentation content
 officecat data.csv                 # CSV and TSV too
+officecat report.docx --tui        # interactive TUI with search & TOC
 officecat budget.xlsx | head       # plain text (auto-detected pipe)
 officecat slides.pptx --json       # JSON output
 ```
 
 ### Output Modes
 
-- **TUI** (default when TTY): Interactive viewer with scrolling, search, and keyboard navigation.
-- **Rich** (`--rich`): Colored, formatted dump to stdout. Non-interactive, pairs well with `less -R`.
+- **Rich** (default): Colored, formatted output to stdout. Non-interactive, works with `less -R`.
+- **TUI** (`--tui`): Interactive viewer with scrolling, search, table of contents sidebar, and keyboard navigation.
 - **Plain** (auto when piped, or `--plain`): Raw markdown text for piping to `grep`, `head`, `awk`, etc.
 - **JSON** (`--json`): Structured output for scripting — `{"source": "...", "markdown": "..."}`.
 
@@ -32,7 +33,7 @@ officecat slides.pptx --json       # JSON output
 
 | Flag | Short | Description |
 |---|---|---|
-| `--rich` | `-r` | Colored formatted dump (non-interactive) |
+| `--tui` | `-t` | Interactive TUI viewer with search and TOC |
 | `--plain` | `-p` | Raw markdown text, no colors |
 | `--json` | `-j` | JSON output |
 | `--head N` | `-n N` | Show first N lines of markdown output |
@@ -43,24 +44,31 @@ officecat slides.pptx --json       # JSON output
 | Key | Action |
 |---|---|
 | `q` / `Esc` | Quit |
-| `Up` / `Down` / `j` / `k` | Scroll |
+| `t` | Toggle table of contents sidebar |
+| `/` | Open search |
+| `Enter` | Next search result |
+| `Esc` (in search) | Close search |
+| `Up` / `Down` | Scroll |
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to top/bottom |
-| `/` | Open search |
-| `n` / `N` | Next/previous search result |
-| `Esc` (in search) | Close search |
 
 ### Examples
 
 ```bash
-# View first 10 lines of converted markdown
+# Quick view of a document
+officecat report.docx
+
+# Browse interactively with search
+officecat report.docx --tui
+
+# View first 10 lines
 officecat budget.xlsx --head 10
 
-# Heading outline of a document
+# Heading outline
 officecat report.docx --list
 
-# Colored dump piped to less
-officecat report.docx --rich | less -R
+# Colored output piped to less
+officecat report.docx | less -R
 
 # JSON output for scripting
 officecat report.docx --json | jq '.markdown'

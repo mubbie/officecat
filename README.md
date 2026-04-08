@@ -2,6 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/officecat)](https://pypi.org/project/officecat/)
 [![CI](https://github.com/mubbie/officecat/actions/workflows/ci.yml/badge.svg)](https://github.com/mubbie/officecat/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/officecat)](https://pypi.org/project/officecat/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/mubbie/officecat/blob/main/LICENSE)
 
 A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, `.csv`, and `.tsv` files.

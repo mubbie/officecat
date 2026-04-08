@@ -39,6 +39,7 @@ Issues = "https://github.com/mubbie/officecat/issues"
 
 [project.scripts]
 officecat = "officecat.cli:cli_entry"
+ocat = "officecat.cli:cli_entry"
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]

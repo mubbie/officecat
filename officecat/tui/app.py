@@ -21,10 +21,10 @@ class OfficeCatApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, source: str, markdown: str, **kwargs: object) -> None:
+    def __init__(self, source: str, markdown: str) -> None:
         self._source = source
         self._markdown = markdown
-        super().__init__(**kwargs)
+        super().__init__()
         self.title = f"officecat — {self._source}"
 
     def compose(self) -> ComposeResult:

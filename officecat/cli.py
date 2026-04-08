@@ -133,14 +133,14 @@ def run(
         tui_app = OfficeCatApp(source=str(file), markdown=markdown)
         tui_app.run()
     elif mode == "rich":
-        from officecat.renderers.rich import render
-        render(markdown, head=head)
+        from officecat.renderers import rich as _rich
+        _rich.render(markdown, head=head)
     elif mode == "json":
-        from officecat.renderers.json_ import render
-        render(str(file), markdown)
+        from officecat.renderers import json_ as _json
+        _json.render(str(file), markdown)
     else:
-        from officecat.renderers.plain import render
-        render(markdown, head=head)
+        from officecat.renderers import plain as _plain
+        _plain.render(markdown, head=head)
 
 
 def _error(msg: str) -> None:

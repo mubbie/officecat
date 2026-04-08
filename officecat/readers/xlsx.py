@@ -29,7 +29,7 @@ def _format_cell(value: object) -> str:
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     if hasattr(value, "isoformat"):
-        return value.isoformat()
+        return str(value.isoformat())
     return str(value)
 
 
@@ -127,10 +127,11 @@ def to_markdown(
             section_lines.append("| " + " | ".join(header_row) + " |")
             section_lines.append("| " + " | ".join(["---"] * col_count) + " |")
 
-            for row in data_rows:
-                padded = row + [""] * (col_count - len(row))
+            for data_row in data_rows:
+                cells: list[str] = list(data_row)
+                cells += [""] * (col_count - len(cells))
                 section_lines.append(
-                    "| " + " | ".join(padded[:col_count]) + " |"
+                    "| " + " | ".join(cells[:col_count]) + " |"
                 )
 
             if total_rows > len(data_rows):

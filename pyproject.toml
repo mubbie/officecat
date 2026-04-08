@@ -1,14 +1,28 @@
-[build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "officecat"
 version = "0.1.0"
 description = "View Office files in the terminal"
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
-license = "MIT"
+authors = [
+    {name = "Mubbie Idoko"},
+]
+keywords = ["office", "cli", "docx", "xlsx", "pptx", "csv", "terminal", "viewer"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business",
+    "Topic :: Utilities",
+]
 dependencies = [
     "typer>=0.9",
     "textual>=0.50",
@@ -18,17 +32,32 @@ dependencies = [
     "rich",
 ]
 
+[project.urls]
+Homepage = "https://github.com/mubbie/officecat"
+Repository = "https://github.com/mubbie/officecat"
+Issues = "https://github.com/mubbie/officecat/issues"
+
 [project.scripts]
 officecat = "officecat.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "ruff", "mypy"]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
+target-version = "py310"
 line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,5 +1,8 @@
 # officecat 🐱
 
+[![PyPI](https://img.shields.io/pypi/v/officecat)](https://pypi.org/project/officecat/)
+[![CI](https://github.com/mubbie/officecat/actions/workflows/ci.yml/badge.svg)](https://github.com/mubbie/officecat/actions/workflows/ci.yml)
+
 A CLI tool to view Office files in the terminal. Think `cat` but for `.docx`, `.pptx`, `.xlsx`, `.csv`, and `.tsv` files.
 
 Every supported format is converted to markdown internally, then rendered through a single unified pipeline.

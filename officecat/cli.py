@@ -16,15 +16,36 @@ _TABULAR_FMTS = {"xlsx", "csv"}
 
 @app.command()
 def run(
-    file: Annotated[Path, typer.Argument(help="File to view.")],
-    tui: Annotated[bool, typer.Option("--tui", "-t", help="Interactive full-screen viewer.")] = False,
-    plain: Annotated[bool, typer.Option("--plain", "-p", help="Raw markdown text, no colors.")] = False,
-    json: Annotated[bool, typer.Option("--json", "-j", help="JSON output.")] = False,
-    head: Annotated[Optional[int], typer.Option("--head", "-n", help="Show first N lines (or items for readers).")] = None,
-    sheet: Annotated[Optional[str], typer.Option("--sheet", "-s", help="Select sheet by name or 1-based index (xlsx only).")] = None,
-    slide: Annotated[Optional[int], typer.Option("--slide", help="Show only slide N (pptx only).")] = None,
-    headers: Annotated[int, typer.Option("--headers", "-h", help="Promote row N as headers (xlsx/csv, default: 1, 0 to disable).")] = 1,
-    show_all: Annotated[bool, typer.Option("--all", "-a", help="Disable the default row cap.")] = False,
+    file: Annotated[
+        Path, typer.Argument(help="File to view.")
+    ],
+    tui: Annotated[
+        bool, typer.Option("--tui", "-t", help="Interactive viewer.")
+    ] = False,
+    plain: Annotated[
+        bool, typer.Option("--plain", "-p", help="Raw markdown, no colors.")
+    ] = False,
+    json: Annotated[
+        bool, typer.Option("--json", "-j", help="JSON output.")
+    ] = False,
+    head: Annotated[
+        Optional[int], typer.Option("--head", "-n", help="Show first N lines.")
+    ] = None,
+    sheet: Annotated[
+        Optional[str],
+        typer.Option("--sheet", "-s", help="Sheet by name or index (xlsx)."),
+    ] = None,
+    slide: Annotated[
+        Optional[int],
+        typer.Option("--slide", help="Show only slide N (pptx)."),
+    ] = None,
+    headers: Annotated[
+        int,
+        typer.Option("--headers", "-h", help="Row N as headers (default: 1)."),
+    ] = 1,
+    show_all: Annotated[
+        bool, typer.Option("--all", "-a", help="Disable the row cap.")
+    ] = False,
 ) -> None:
     """View Office files in the terminal.
 
@@ -39,7 +60,7 @@ def run(
         _error(f"File '{file}' not found.")
 
     # ── Validate format ──
-    from officecat.detect import FileFormat, detect_format
+    from officecat.detect import detect_format
     fmt = detect_format(file)
 
     # ── Validate format-specific flags ──
@@ -101,7 +122,10 @@ def run(
             # Truncate to ~1000 lines for TUI performance
             lines = markdown.splitlines()
             markdown = "\n".join(lines[:1000])
-            markdown += "\n\n*TUI limited to first 1000 lines. Use --plain or --rich with --all to view everything.*"
+            markdown += (
+                "\n\n*TUI limited to first 1000 lines."
+                " Use --plain with --all to view everything.*"
+            )
 
     # ── Render ──
     if mode == "tui":
